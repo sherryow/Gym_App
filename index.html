@@ -111,7 +111,6 @@
             margin-bottom: 10px;
         }
         
-        /* Last Performance Target Suggestion Box */
         .history-suggestion {
             background-color: #f7fafc;
             border-left: 4px solid var(--primary);
@@ -227,6 +226,19 @@
             text-align: left;
         }
 
+        .preview-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style: none;
+        }
+        .preview-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+
         .guide-text { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
     </style>
 </head>
@@ -237,14 +249,15 @@
         <div id="live-banner" class="live-timer-banner">Workout Active: <span id="banner-clock">00:00</span></div>
     </div>
 
+    <!-- SCREEN 1: DASHBOARD -->
     <div id="screen-dashboard" class="screen active">
         <div class="card">
             <h3 class="card-title">Select Gym Workout</h3>
-            <p class="guide-text" style="margin-bottom:15px;">Launches the tracking engine. The app remembers your past stats and helps you push for progression.</p>
+            <p class="guide-text" style="margin-bottom:15px;">Launches the tracking engine. Select a day to preview structure before initializing clock metrics.</p>
             <div style="display: flex; flex-direction: column; gap: 10px;">
-                <button class="btn btn-primary" onclick="startWorkoutSession('push')">🏋️ Monday: Push Focus</button>
-                <button class="btn btn-primary" onclick="startWorkoutSession('pull')">💪 Wednesday: Pull + Arms Focus</button>
-                <button class="btn btn-primary" onclick="startWorkoutSession('legs')">🦵 Friday: Upper + Legs Focus</button>
+                <button class="btn btn-primary" onclick="setupWorkoutPreview('push')">🏋️ Monday: Push Focus</button>
+                <button class="btn btn-primary" onclick="setupWorkoutPreview('pull')">💪 Wednesday: Pull + Arms Focus</button>
+                <button class="btn btn-primary" onclick="setupWorkoutPreview('legs')">🦵 Friday: Upper + Legs Focus</button>
             </div>
         </div>
 
@@ -263,6 +276,20 @@
         </div>
     </div>
 
+    <!-- SCREEN 2: WORKOUT PREVIEW & COLD START CONTROLLER -->
+    <div id="screen-workout-preview" class="screen">
+        <div class="card" style="border-top: 4px solid var(--primary);">
+            <h2 id="preview-day-title" style="margin:0 0 5px 0; font-size:1.4rem;">Workout Preview</h2>
+            <span id="preview-day-subtitle" style="color:var(--text-muted); font-size:0.85rem; font-weight:600; text-transform:uppercase;">Protocol Structure</span>
+            
+            <ul id="preview-exercises-list" class="preview-list"></ul>
+            
+            <button class="btn btn-success" style="padding:14px; font-size:1rem;" onclick="activateWorkoutSession()">🚀 Start Active Session</button>
+            <button class="btn" style="margin-top: 10px; background:transparent;" onclick="switchScreen('dashboard')">Back to Dashboard</button>
+        </div>
+    </div>
+
+    <!-- SCREEN 3: ACTIVE DYNAMIC WORKOUT -->
     <div id="screen-active-workout" class="screen">
         <div class="card" style="border-top: 4px solid var(--accent);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
@@ -294,6 +321,7 @@
         </div>
     </div>
 
+    <!-- SCREEN 4: RUNNING MANAGER -->
     <div id="screen-running" class="screen">
         <div class="card">
             <h3 class="card-title">Log New Running Entry</h3>
@@ -328,6 +356,7 @@
         </div>
     </div>
 
+    <!-- SCREEN 5: LOGBOOK LOGS -->
     <div id="screen-history" class="screen">
         <div class="card">
             <h3 class="card-title">Completed Gym Log History</h3>
@@ -338,6 +367,7 @@
         </div>
     </div>
 
+    <!-- FIXED NAV SYSTEM -->
     <div class="bottom-nav">
         <div class="nav-item active" id="nav-dash" onclick="switchScreen('dashboard')">
             <span class="nav-icon">🏋️</span>
@@ -354,6 +384,7 @@
     </div>
 
     <script>
+        // HARDCODED BASELINE VALUES SEEDED DIRECTLY INTO THE TARGET METRICS SCHEMA
         const programDatabase = {
             push: [
                 { id: "p1", name: "Barbell Bench Press", target: "4 x 6-8", sets: 4, minReps: 6, maxReps: 8 },
@@ -364,29 +395,30 @@
                 { id: "p6", name: "DB Overhead Triceps Extension", target: "2 x 10-12", sets: 2, minReps: 10, maxReps: 12 }
             ],
             pull: [
-                { id: "l1", name: "Barbell Bent-Over Row", target: "4 x 6-8", sets: 4, minReps: 6, maxReps: 8 },
-                { id: "l2", name: "Dumbbell Row or Cable Row", target: "3 x 8-12", sets: 3, minReps: 8, maxReps: 12 },
-                { id: "l3", name: "Cable Face Pull", target: "3 x 12-15", sets: 3, minReps: 12, maxReps: 15 },
-                { id: "l4", name: "Barbell Curl", target: "3 x 8-10", sets: 3, minReps: 8, maxReps: 10 },
-                { id: "l5", name: "Incline Dumbbell Curl", target: "3 x 10-12", sets: 3, minReps: 10, maxReps: 12 },
-                { id: "l6", name: "Hammer Curl", target: "2 x 12-15", sets: 2, minReps: 12, maxReps: 15 },
-                { id: "l7", name: "Kettlebell Farmer Carry", target: "2 x 30-45s", sets: 2, minReps: 30, maxReps: 45 }
+                { id: "l1", name: "Barbell Bent-Over Row", target: "4 x 6-8", sets: 4, minReps: 6, maxReps: 8, baselineWeight: 65 },
+                { id: "l2", name: "Dumbbell Row or Cable Row", target: "3 x 8-12", sets: 3, minReps: 8, maxReps: 12, baselineWeight: 22.5 },
+                { id: "l3", name: "Cable Face Pull", target: "3 x 12-15", sets: 3, minReps: 12, maxReps: 15, baselineWeight: 25 },
+                { id: "l4", name: "Barbell Curl", target: "3 x 8-10", sets: 3, minReps: 8, maxReps: 10, baselineWeight: 22.5 },
+                { id: "l5", name: "Incline Dumbbell Curl", target: "3 x 10-12", sets: 3, minReps: 10, maxReps: 12, baselineWeight: 15 },
+                { id: "l6", name: "Hammer Curl", target: "2 x 12-15", sets: 2, minReps: 12, maxReps: 15, baselineWeight: 15 },
+                { id: "l7", name: "Kettlebell Farmer Carry", target: "2 x 30-45s", sets: 2, minReps: 30, maxReps: 45, baselineWeight: 24 }
             ],
             legs: [
-                { id: "f1", name: "Incline Barbell Bench or DB Bench", target: "4 x 8-10", sets: 4, minReps: 8, maxReps: 10 },
-                { id: "f2", name: "Dumbbell Shoulder Press", target: "3 x 8-10", sets: 3, minReps: 8, maxReps: 10 },
-                { id: "f3", name: "Goblet Squat or Barbell Back Squat", target: "3 x 8-10", sets: 3, minReps: 8, maxReps: 10 },
-                { id: "f4", name: "Cable Chest Fly", target: "3 x 12-15", sets: 3, minReps: 12, maxReps: 15 },
-                { id: "f5", name: "Dumbbell Lateral Raise", target: "3 x 15-20", sets: 3, minReps: 15, maxReps: 20 },
-                { id: "f6", name: "Close-Grip Bench or Bench Dips", target: "3 x 8-12", sets: 3, minReps: 8, maxReps: 12 },
-                { id: "f7", name: "Cable Curl or Dumbbell Curl", target: "3 x 10-15", sets: 3, minReps: 10, maxReps: 15 }
+                { id: "f1", name: "Incline Barbell Bench or DB Bench", target: "4 x 8-10", sets: 4, minReps: 8, maxReps: 10, baselineWeight: 55 },
+                { id: "f2", name: "Dumbbell Shoulder Press", target: "3 x 8-10", sets: 3, minReps: 8, maxReps: 10, baselineWeight: 17.5 },
+                { id: "f3", name: "Goblet Squat or Barbell Back Squat", target: "3 x 8-10", sets: 3, minReps: 8, maxReps: 10, baselineWeight: 90 },
+                { id: "f4", name: "Cable Chest Fly", target: "3 x 12-15", sets: 3, minReps: 12, maxReps: 15, baselineWeight: 20 },
+                { id: "f5", name: "Dumbbell Lateral Raise", target: "3 x 15-20", sets: 3, minReps: 15, maxReps: 20, baselineWeight: 10 },
+                { id: "f6", name: "Close-Grip Bench or Bench Dips", target: "3 x 8-12", sets: 3, minReps: 8, maxReps: 12, baselineWeight: 50 },
+                { id: "f7", name: "Cable Curl or Dumbbell Curl", target: "3 x 10-15", sets: 3, minReps: 10, maxReps: 15, baselineWeight: 17.5 }
             ]
         };
 
         let appState = {
             gymHistory: JSON.parse(localStorage.getItem('gymHistory')) || [],
             runningHistory: JSON.parse(localStorage.getItem('runningHistory')) || [],
-            currentSession: null
+            currentSession: null,
+            previewType: null
         };
 
         let timerInterval = null;
@@ -408,6 +440,8 @@
             
             if (screenId === 'active-workout') {
                 document.getElementById('screen-active-workout').classList.add('active');
+            } else if (screenId === 'workout-preview') {
+                document.getElementById('screen-workout-preview').classList.add('active');
             } else {
                 document.getElementById(`screen-${screenId}`).classList.add('active');
                 const navMap = { 'dashboard': 'nav-dash', 'running': 'nav-run', 'history': 'nav-hist' };
@@ -415,29 +449,33 @@
             }
         }
 
-        // FIND PAST PERFORMANCE LOGS FOR SPECIFIC EXERCISE
-        function getPreviousExercisePerformance(exerciseId) {
-            // Scan historical log backwards to find the most recent matching exercise block
-            for (let i = 0; i < appState.gymHistory.length; i++) {
-                const pastWorkout = appState.gymHistory[i];
-                let matchedSets = [];
-                
-                // Collect any registered sets for this exercise ID from this historical workout
-                for (let s = 1; s <= 10; s++) {
-                    const key = `${exerciseId}_s${s}`;
-                    if (pastWorkout.logs && pastWorkout.logs[key] && pastWorkout.logs[key].done) {
-                        matchedSets.push(pastWorkout.logs[key]);
-                    }
-                }
-                
-                if (matchedSets.length > 0) {
-                    return matchedSets; // Returns array of past sets: [{weight: 60, reps: 8}, ...]
-                }
-            }
-            return null;
+        // PREVIEW BEFORE RUNNING THE ACTIVE SESSIONS
+        function setupWorkoutPreview(dayType) {
+            appState.previewType = dayType;
+            const exercises = programDatabase[dayType];
+            
+            const titleMap = { push: "Monday", pull: "Wednesday", legs: "Friday" };
+            const subMap = { push: "Push Focus", pull: "Pull + Arms Focus", legs: "Upper + Legs Focus" };
+            
+            document.getElementById('preview-day-title').innerText = `${titleMap[dayType]} Session`;
+            document.getElementById('preview-day-subtitle').innerText = subMap[dayType];
+            
+            const listContainer = document.getElementById('preview-exercises-list');
+            listContainer.innerHTML = '';
+            
+            exercises.forEach(ex => {
+                const li = document.createElement('li');
+                let baselineDetail = ex.baselineWeight ? ` [Base: ${ex.baselineWeight}kg]` : '';
+                li.innerHTML = `<span><strong>${ex.name}</strong>${baselineDetail}</span> <span style="color:var(--primary); font-weight:600;">${ex.target}</span>`;
+                listContainer.appendChild(li);
+            });
+            
+            switchScreen('workout-preview');
         }
 
-        function startWorkoutSession(dayType) {
+        // ACTIVATE SESSIONS EXTRACTOR VIA THE NEW EXPLICIT BUTTON
+        function activateWorkoutSession() {
+            const dayType = appState.previewType;
             appState.currentSession = {
                 type: dayType,
                 exercises: programDatabase[dayType],
@@ -463,6 +501,27 @@
             renderActiveExercise();
         }
 
+        function getPreviousExercisePerformance(exerciseId, defaultBaseline) {
+            // First check user history logs
+            for (let i = 0; i < appState.gymHistory.length; i++) {
+                const pastWorkout = appState.gymHistory[i];
+                let matchedSets = [];
+                for (let s = 1; s <= 10; s++) {
+                    const key = `${exerciseId}_s${s}`;
+                    if (pastWorkout.logs && pastWorkout.logs[key] && pastWorkout.logs[key].done) {
+                        matchedSets.push(pastWorkout.logs[key]);
+                    }
+                }
+                if (matchedSets.length > 0) return matchedSets;
+            }
+            
+            // If no user historical records exist, fallback to the hardcoded preset weights as baseline Set 1
+            if (defaultBaseline) {
+                return [{ weight: defaultBaseline, reps: 0, isBaselineSeed: true }];
+            }
+            return null;
+        }
+
         function renderActiveExercise() {
             const session = appState.currentSession;
             const ex = session.exercises[session.currentExerciseIndex];
@@ -471,34 +530,38 @@
             document.getElementById('active-ex-target').innerText = `Target Protocol: ${ex.target}`;
             document.getElementById('active-ex-index').innerText = `${session.currentExerciseIndex + 1} of ${session.exercises.length}`;
 
-            // CALCULATE PAST PERFORMACE & INTELLIGENT SUGGESTIONS
-            const pastPerformance = getPreviousExercisePerformance(ex.id);
+            const pastPerformance = getPreviousExercisePerformance(ex.id, ex.baselineWeight);
             const suggestionBox = document.getElementById('active-history-suggestion');
             
             let suggestedWeightPlaceholder = "";
             let suggestedRepsPlaceholder = "";
 
             if (pastPerformance && pastPerformance.length > 0) {
-                // Grab data from Set 1 of last time as a metric guideline
                 const lastSet1 = pastPerformance[0];
-                let historyText = `⏮️ <strong>Last time:</strong> ${lastSet1.weight}kg × ${lastSet1.reps} reps (Set 1).<br>`;
                 
-                // Generate automated goal advice based on rep targets
-                if (lastSet1.reps >= ex.maxReps) {
-                    historyText += `🎯 <strong>Goal:</strong> Hit max reps last time! Increase weight by 1–2.5kg and aim for ${ex.minReps} reps.`;
-                    suggestedWeightPlaceholder = lastSet1.weight + 2; 
+                if (lastSet1.isBaselineSeed) {
+                    // Logic flow for hardcoded initial baseline tracking blocks
+                    suggestionBox.innerHTML = `⏮️ <strong>Baseline Seed:</strong> ${lastSet1.weight}kg.<br>🎯 <strong>Goal:</strong> Complete your first session sets here. Target the rep threshold bounds!`;
+                    suggestedWeightPlaceholder = lastSet1.weight;
                     suggestedRepsPlaceholder = ex.minReps;
                 } else {
-                    historyText += `🎯 <strong>Goal:</strong> Add reps! Stick to ${lastSet1.weight}kg and push for ${lastSet1.reps + 1} reps.`;
-                    suggestedWeightPlaceholder = lastSet1.weight;
-                    suggestedRepsPlaceholder = lastSet1.reps + 1;
+                    // Normal dynamic workout-to-workout tracking calculation
+                    let historyText = `⏮️ <strong>Last time:</strong> ${lastSet1.weight}kg × ${lastSet1.reps} reps (Set 1).<br>`;
+                    if (lastSet1.reps >= ex.maxReps) {
+                        historyText += `🎯 <strong>Goal:</strong> Hit max reps last time! Increase weight by 1–2.5kg and aim for ${ex.minReps} reps.`;
+                        suggestedWeightPlaceholder = lastSet1.weight + 2; 
+                        suggestedRepsPlaceholder = ex.minReps;
+                    } else {
+                        historyText += `🎯 <strong>Goal:</strong> Add reps! Stick to ${lastSet1.weight}kg and push for ${lastSet1.reps + 1} reps.`;
+                        suggestedWeightPlaceholder = lastSet1.weight;
+                        suggestedRepsPlaceholder = lastSet1.reps + 1;
+                    }
+                    suggestionBox.innerHTML = historyText;
                 }
-                suggestionBox.innerHTML = historyText;
             } else {
                 suggestionBox.innerHTML = "🆕 <strong>Baseline:</strong> No history found. Find a weight that lands you 1-2 reps shy of failure.";
             }
 
-            // Build individual interactive set lists
             const container = document.getElementById('active-sets-container');
             container.innerHTML = '';
 
@@ -506,16 +569,13 @@
                 const setKey = `${ex.id}_s${s}`;
                 const savedSet = session.loggedSets[setKey] || { weight: '', reps: '', done: false };
 
-                // Pull historical details for this specific set number if available
                 let specificSetWeight = savedSet.weight;
                 let specificSetReps = savedSet.reps;
                 
-                // If fields are empty and we have a calculated global suggestion, show them as input placeholders
                 let wPlaceholderText = suggestedWeightPlaceholder || "kg";
                 let rPlaceholderText = suggestedRepsPlaceholder || "reps";
                 
-                // If we have precise match from last week's exact set number, override placeholders
-                if (!specificSetWeight && pastPerformance && pastPerformance[s - 1]) {
+                if (!specificSetWeight && pastPerformance && pastPerformance[s - 1] && !pastPerformance[s - 1].isBaselineSeed) {
                     wPlaceholderText = pastPerformance[s - 1].weight;
                     rPlaceholderText = pastPerformance[s - 1].reps;
                 }
@@ -543,13 +603,8 @@
             const rInput = document.getElementById(`r_${setKey}`);
             
             if (!row.classList.contains('completed')) {
-                // Support quick entry: If empty but placeholder has a number, treat placeholder as value
-                if (!wInput.value && wInput.placeholder && !isNaN(wInput.placeholder)) {
-                    wInput.value = wInput.placeholder;
-                }
-                if (!rInput.value && rInput.placeholder && !isNaN(rInput.placeholder)) {
-                    rInput.value = rInput.placeholder;
-                }
+                if (!wInput.value && wInput.placeholder && !isNaN(wInput.placeholder)) wInput.value = wInput.placeholder;
+                if (!rInput.value && rInput.placeholder && !isNaN(rInput.placeholder)) rInput.value = rInput.placeholder;
 
                 if (!wInput.value || !rInput.value) {
                     alert("Please fill or confirm fields before checking off.");
@@ -706,13 +761,14 @@
             container.innerHTML = html;
         }
 
+        // STATS AND HELPERS
         function updateDashboardCounters() {
             document.getElementById('stat-gym-count').innerText = appState.gymHistory.length;
             document.getElementById('stat-run-count').innerText = appState.runningHistory.length;
         }
 
         function clearAllData() {
-            if(confirm("Danger! Reset all data points?")) {
+            if(confirm("Danger! Reset all data points? This clears history logs but keeps your structural base targets.")) {
                 localStorage.clear();
                 appState.gymHistory = [];
                 appState.runningHistory = [];
